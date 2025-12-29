@@ -56,24 +56,15 @@ module semarang_workshop::workshop_nft {
     }
 
     public fun mint_nft(
-        name: vector<u8>,
-        description: vector<u8>,
-        url: vector<u8>,
         ctx: &mut TxContext
     ): NFT {
         let nft = NFT {
             id: object::new(ctx),
-            name: utf8(name),
-            description: utf8(description),
-            url: utf8(url),
+            name: utf8(b"Sui Dev Workshop NFT"),
+            description: utf8(b"A commemorative NFT for the 2025 Semarang Sui Developer Workshop."),
+            url: utf8(b"https://turquoise-adequate-jay-379.mypinata.cloud/ipfs/bafybeicfbvqubifkwxhorjtolybvj2staix2j4yofaok5zzii75fedk4ua"),
         };
 
         nft
     }
-
 }
-
-        
-
-    
-

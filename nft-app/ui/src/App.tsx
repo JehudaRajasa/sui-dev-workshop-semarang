@@ -5,32 +5,37 @@ import {
 } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { useState } from 'react';
+import './App.css';
 
 // Replace with your actual package ID after deployment
 const PACKAGE_ID =
-  '0x8c372e555afff9416c94c398da857ebc612c206df048f11e4a609602107f56d1'; // Placeholder
+  '0x49649ef13ff32d0ca99768dc7dda6f8d3a47620b7ee5d92b7c6612413ae1a900';
 const MODULE_NAME = 'workshop_nft';
 const FUNCTION_NAME = 'mint_nft';
+
+// Static NFT Data
+// This must match the hardcoded data in the Move contract
+const NFT_DATA = {
+  name: 'Sui Dev Workshop NFT',
+  description:
+    'A commemorative NFT for the 2025 Semarang Sui Developer Workshop.',
+  imageUrl:
+    'https://turquoise-adequate-jay-379.mypinata.cloud/ipfs/bafybeicfbvqubifkwxhorjtolybvj2staix2j4yofaok5zzii75fedk4ua'
+};
 
 function App() {
   const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
   const currentAccount = useCurrentAccount();
   const [digest, setDigest] = useState('');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [url, setUrl] = useState('');
+  const [isMinting, setIsMinting] = useState(false);
 
   const handleMint = () => {
     if (!currentAccount) return;
+    setIsMinting(true);
 
     const tx = new Transaction();
     const [nft] = tx.moveCall({
-      target: `${PACKAGE_ID}::${MODULE_NAME}::${FUNCTION_NAME}`,
-      arguments: [
-        tx.pure.string(name),
-        tx.pure.string(description),
-        tx.pure.string(url)
-      ]
+      target: `${PACKAGE_ID}::${MODULE_NAME}::${FUNCTION_NAME}`
     });
 
     tx.transferObjects([nft], tx.pure.address(currentAccount.address));
@@ -43,10 +48,12 @@ function App() {
         onSuccess: (result) => {
           console.log('executed transaction', result);
           setDigest(result.digest);
+          setIsMinting(false);
           alert(`NFT Minted! Digest: ${result.digest}`);
         },
         onError: (error) => {
           console.error(error);
+          setIsMinting(false);
           alert(
             'Minting failed. Make sure you have deployed the contract and updated PACKAGE_ID.'
           );
@@ -56,59 +63,55 @@ function App() {
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Sui NFT Minter</h1>
-      <ConnectButton />
+    <div className="app-container" style={{ backgroundImage: `url(${NFT_DATA.imageUrl})` }}>
+      <div className="overlay"></div>
+      
+      <div className="bento-box">
+        <header className="app-header">
+          <ConnectButton />
+        </header>
 
-      {currentAccount ? (
-        <div style={{ marginTop: 20 }}>
-          <div>
-            <label>Name: </label>
-            <input
-              type='text'
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder='NFT Name'
-            />
+        <main className="app-content">
+          <div className="nft-preview-container">
+             <img src={NFT_DATA.imageUrl} alt="NFT Preview" className="nft-image" />
           </div>
-          <div style={{ marginTop: 10 }}>
-            <label>Description: </label>
-            <input
-              type='text'
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder='NFT Description'
-            />
-          </div>
-          <div style={{ marginTop: 10 }}>
-            <label>Image URL: </label>
-            <input
-              type='text'
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder='Image URL'
-            />
+          
+          <div className="nft-details">
+            <h2>{NFT_DATA.name}</h2>
+            <p>{NFT_DATA.description}</p>
           </div>
 
-          <button
-            onClick={handleMint}
-            style={{ marginTop: 20 }}
-            disabled={!name || !description || !url}
-          >
-            Mint NFT
-          </button>
-
-          {digest && (
-            <div style={{ marginTop: 20 }}>
-              <strong>Transaction Digest:</strong> {digest}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ marginTop: 20 }}>
-          Please connect your wallet to mint an NFT.
-        </div>
-      )}
+          <div className="mint-section">
+            {currentAccount ? (
+              <>
+                <button
+                  className="mint-button"
+                  onClick={handleMint}
+                  disabled={isMinting}
+                >
+                  {isMinting ? 'Minting...' : 'Mint NFT'}
+                </button>
+                {digest && (
+                  <div className="transaction-success">
+                    <p>Success! Transaction Digest:</p>
+                    <a 
+                      href={`https://suiscan.xyz/testnet/tx/${digest}`} 
+                      target="_blank" 
+                      rel="noreferrer"
+                    >
+                      {digest.slice(0, 10)}...
+                    </a>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="connect-prompt">
+                <p>Connect your wallet to mint this exclusive NFT.</p>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
