@@ -135,6 +135,12 @@ body {
   transform: none;
 }
 
+.mint-button.already-minted {
+  background-color: #4b5563; /* Grey color */
+  opacity: 0.8;
+  box-shadow: none;
+}
+
 .connect-prompt {
   text-align: center;
   color: #aaa;

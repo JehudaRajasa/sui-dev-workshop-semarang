@@ -1,15 +1,18 @@
 import {
   ConnectButton,
   useCurrentAccount,
-  useSignAndExecuteTransaction
+  useSignAndExecuteTransaction,
+  useSuiClient
 } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 
 // Replace with your actual package ID after deployment
 const PACKAGE_ID =
-  '0x49649ef13ff32d0ca99768dc7dda6f8d3a47620b7ee5d92b7c6612413ae1a900';
+  '0x6b0830bdc4639cee791d17bd87682a071db75e2a21ada1cb072744b0e8604ed7';
+const MINT_TRACKER_ID =
+  '0x15f1bfb748e4b5f9e68d975d8988addb1a84e3c9331575fd2f3afbbd21d62058';
 const MODULE_NAME = 'workshop_nft';
 const FUNCTION_NAME = 'mint_nft';
 
@@ -26,8 +29,57 @@ const NFT_DATA = {
 function App() {
   const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
   const currentAccount = useCurrentAccount();
+  const suiClient = useSuiClient();
   const [digest, setDigest] = useState('');
   const [isMinting, setIsMinting] = useState(false);
+  const [hasMinted, setHasMinted] = useState(false);
+
+  useEffect(() => {
+    const checkMintStatus = async () => {
+      if (!currentAccount) {
+        setHasMinted(false);
+        return;
+      }
+
+      try {
+        // 1. Get the MintTracker object to find the Table ID
+        const trackerObj = await suiClient.getObject({
+          id: MINT_TRACKER_ID,
+          options: { showContent: true }
+        });
+
+        if (trackerObj.data?.content?.dataType === 'moveObject') {
+          // @ts-ignore
+          const mintersTable = trackerObj.data.content.fields.minters;
+          const tableId = mintersTable.fields.id.id;
+
+          // 2. Check if the user is in the table
+          try {
+            const field = await suiClient.getDynamicFieldObject({
+              parentId: tableId,
+              name: {
+                type: 'address',
+                value: currentAccount.address
+              }
+            });
+
+            if (field.data) {
+              setHasMinted(true);
+            } else {
+              setHasMinted(false);
+            }
+          } catch (err) {
+            // Field not found means not minted
+            setHasMinted(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking mint status:', error);
+      }
+    };
+
+    checkMintStatus();
+  }, [currentAccount, suiClient]);
 
   const handleMint = () => {
     if (!currentAccount) return;
@@ -35,7 +87,8 @@ function App() {
 
     const tx = new Transaction();
     const [nft] = tx.moveCall({
-      target: `${PACKAGE_ID}::${MODULE_NAME}::${FUNCTION_NAME}`
+      target: `${PACKAGE_ID}::${MODULE_NAME}::${FUNCTION_NAME}`,
+      arguments: [tx.object(MINT_TRACKER_ID)]
     });
 
     tx.transferObjects([nft], tx.pure.address(currentAccount.address));
@@ -49,6 +102,7 @@ function App() {
           console.log('executed transaction', result);
           setDigest(result.digest);
           setIsMinting(false);
+          setHasMinted(true);
           alert(`NFT Minted! Digest: ${result.digest}`);
         },
         onError: (error) => {
@@ -63,41 +117,52 @@ function App() {
   };
 
   return (
-    <div className="app-container" style={{ backgroundImage: `url(${NFT_DATA.imageUrl})` }}>
-      <div className="overlay"></div>
-      
-      <div className="bento-box">
-        <header className="app-header">
+    <div
+      className='app-container'
+      style={{ backgroundImage: `url(${NFT_DATA.imageUrl})` }}
+    >
+      <div className='overlay'></div>
+
+      <div className='bento-box'>
+        <header className='app-header'>
           <ConnectButton />
         </header>
 
-        <main className="app-content">
-          <div className="nft-preview-container">
-             <img src={NFT_DATA.imageUrl} alt="NFT Preview" className="nft-image" />
+        <main className='app-content'>
+          <div className='nft-preview-container'>
+            <img
+              src={NFT_DATA.imageUrl}
+              alt='NFT Preview'
+              className='nft-image'
+            />
           </div>
-          
-          <div className="nft-details">
+
+          <div className='nft-details'>
             <h2>{NFT_DATA.name}</h2>
             <p>{NFT_DATA.description}</p>
           </div>
 
-          <div className="mint-section">
+          <div className='mint-section'>
             {currentAccount ? (
               <>
                 <button
-                  className="mint-button"
+                  className={`mint-button ${hasMinted ? 'already-minted' : ''}`}
                   onClick={handleMint}
-                  disabled={isMinting}
+                  disabled={isMinting || hasMinted}
                 >
-                  {isMinting ? 'Minting...' : 'Mint NFT'}
+                  {isMinting
+                    ? 'Minting...'
+                    : hasMinted
+                      ? 'Already Minted'
+                      : 'Mint NFT'}
                 </button>
                 {digest && (
-                  <div className="transaction-success">
+                  <div className='transaction-success'>
                     <p>Success! Transaction Digest:</p>
-                    <a 
-                      href={`https://suiscan.xyz/testnet/tx/${digest}`} 
-                      target="_blank" 
-                      rel="noreferrer"
+                    <a
+                      href={`https://suiscan.xyz/testnet/tx/${digest}`}
+                      target='_blank'
+                      rel='noreferrer'
                     >
                       {digest.slice(0, 10)}...
                     </a>
@@ -105,7 +170,7 @@ function App() {
                 )}
               </>
             ) : (
-              <div className="connect-prompt">
+              <div className='connect-prompt'>
                 <p>Connect your wallet to mint this exclusive NFT.</p>
               </div>
             )}
